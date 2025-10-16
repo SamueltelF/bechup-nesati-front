@@ -74,20 +74,25 @@ export const useUserStore = create((set, get) => ({
   },
 
   checkAuth: async () => {
-    set({ checkingAuth: true, loading: true });
+  set({ checkingAuth: true, loading: true });
 
-    try {
-      const response = await axiosBaseURL.get("/auth/profile");
-      set({ user: response?.data?.user, checkingAuth: false, loading: false });
-      localStorage.setItem("user", JSON.stringify(response?.data?.user));
-    } catch (error) {
-      set({ checkingAuth: false, user: null, loading: false });
-      localStorage.removeItem("user");
+  try {
+    const response = await axiosBaseURL.get("/auth/profile");
+    set({ user: response?.data?.user, checkingAuth: false, loading: false });
+    localStorage.setItem("user", JSON.stringify(response?.data?.user));
+  } catch (error) {
+    // Limpar completamente quando falhar
+    set({ checkingAuth: false, user: null, loading: false });
+    localStorage.removeItem("user");
 
-      console.log("error :", error.message);
-      toast.error("Ocorreu um erro na função checkAuth no armazenamento do usuário");
+    console.log("checkAuth error:", error.message);
+    
+    // Não mostrar toast se for erro esperado
+    if (error.response?.data?.code !== "USER_DELETED") {
+      toast.error("Sessão expirada");
     }
-  },
+  }
+},
 
   logout: async () => {
     set({ loading: true });
@@ -342,6 +347,282 @@ export const useUserStore = create((set, get) => ({
       toast.error(error.response?.data?.message || "Erro ao buscar saldo");
     }
   },
+  createAdminProfile: async (data) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.post("/admin-profile/create", data);
+    
+    toast.success("Perfil de vendedor criado com sucesso!");
+    set({ loading: false });
+    return response.data;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error.response?.data?.message || "Erro ao criar perfil de vendedor");
+    throw error;
+  }
+},
+
+// Buscar perfil de vendedor
+getAdminProfile: async () => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.get("/admin-profile/me");
+    set({ loading: false });
+    return response.data.adminProfile;
+  } catch (error) {
+    set({ loading: false });
+    if (error.response?.status !== 404) {
+      toast.error(error.response?.data?.message || "Erro ao buscar perfil");
+    }
+    return null;
+  }
+},
+
+// Atualizar perfil de vendedor
+updateAdminProfile: async (data) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.put("/admin-profile/update", data);
+    toast.success("Perfil atualizado com sucesso!");
+    set({ loading: false });
+    return response.data.adminProfile;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error.response?.data?.message || "Erro ao atualizar perfil");
+    throw error;
+  }
+},
+
+// Upload foto pessoal do vendedor
+uploadAdminPersonalPhoto: async (imageFile) => {
+  set({ loading: true });
+  try {
+    const reader = new FileReader();
+    reader.readAsDataURL(imageFile);
+    
+    return new Promise((resolve, reject) => {
+      reader.onload = async () => {
+        try {
+          const response = await axiosBaseURL.post("/admin-profile/upload/personal-photo", {
+            image: reader.result,
+          });
+          
+          set({ loading: false });
+          toast.success("Foto pessoal enviada com sucesso!");
+          resolve(response.data);
+        } catch (error) {
+          set({ loading: false });
+          toast.error(error.response?.data?.message || "Erro ao enviar foto");
+          reject(error);
+        }
+      };
+      reader.onerror = () => {
+        set({ loading: false });
+        toast.error("Erro ao processar imagem");
+        reject(new Error("Erro ao processar imagem"));
+      };
+    });
+  } catch (error) {
+    set({ loading: false });
+    toast.error("Erro ao enviar foto");
+  }
+},
+
+// Upload RG frente
+uploadRgFront: async (imageFile) => {
+  set({ loading: true });
+  try {
+    const reader = new FileReader();
+    reader.readAsDataURL(imageFile);
+    
+    return new Promise((resolve, reject) => {
+      reader.onload = async () => {
+        try {
+          const response = await axiosBaseURL.post("/admin-profile/upload/rg-front", {
+            image: reader.result,
+          });
+          
+          set({ loading: false });
+          toast.success("RG (frente) enviado com sucesso!");
+          resolve(response.data);
+        } catch (error) {
+          set({ loading: false });
+          toast.error(error.response?.data?.message || "Erro ao enviar RG");
+          reject(error);
+        }
+      };
+    });
+  } catch (error) {
+    set({ loading: false });
+    toast.error("Erro ao enviar RG");
+  }
+},
+
+// Upload RG verso
+uploadRgBack: async (imageFile) => {
+  set({ loading: true });
+  try {
+    const reader = new FileReader();
+    reader.readAsDataURL(imageFile);
+    
+    return new Promise((resolve, reject) => {
+      reader.onload = async () => {
+        try {
+          const response = await axiosBaseURL.post("/admin-profile/upload/rg-back", {
+            image: reader.result,
+          });
+          
+          set({ loading: false });
+          toast.success("RG (verso) enviado com sucesso!");
+          resolve(response.data);
+        } catch (error) {
+          set({ loading: false });
+          toast.error(error.response?.data?.message || "Erro ao enviar RG");
+          reject(error);
+        }
+      };
+    });
+  } catch (error) {
+    set({ loading: false });
+    toast.error("Erro ao enviar RG");
+  }
+},
+
+// Submeter para análise
+submitForReview: async () => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.post("/admin-profile/submit-review");
+    toast.success("Perfil enviado para análise!");
+    set({ loading: false });
+    return response.data;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error.response?.data?.message || "Erro ao enviar para análise");
+    throw error;
+  }
+},
+
+// ============================================
+// FUNÇÕES FINANCEIRAS
+// ============================================
+
+// Dashboard
+getFinancialDashboard: async () => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.get("/financial/dashboard");
+    set({ loading: false });
+    return response.data;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error.response?.data?.message || "Erro ao buscar dashboard");
+    return null;
+  }
+},
+
+// Saldo
+getVendorBalance: async () => {
+  try {
+    const response = await axiosBaseURL.get("/financial/balance");
+    return response.data;
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Erro ao buscar saldo");
+    return null;
+  }
+},
+
+// Histórico de saldo
+getBalanceHistory: async (page = 1, type = null) => {
+  try {
+    const params = { page };
+    if (type) params.type = type;
+    
+    const response = await axiosBaseURL.get("/financial/balance/history", { params });
+    return response.data;
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Erro ao buscar histórico");
+    return null;
+  }
+},
+
+// Vendas
+getMySales: async (page = 1, filters = {}) => {
+  try {
+    const response = await axiosBaseURL.get("/financial/sales", { 
+      params: { page, ...filters } 
+    });
+    return response.data;
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Erro ao buscar vendas");
+    return null;
+  }
+},
+
+// Detalhes de uma venda
+getSaleDetails: async (orderId) => {
+  try {
+    const response = await axiosBaseURL.get(`/financial/sales/${orderId}`);
+    return response.data.sale;
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Erro ao buscar venda");
+    return null;
+  }
+},
+
+// Atualizar código de rastreio
+updateTrackingCode: async (orderId, trackingCode) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.put(`/financial/sales/${orderId}/tracking`, {
+      trackingCode
+    });
+    toast.success("Código de rastreio atualizado!");
+    set({ loading: false });
+    return response.data;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error.response?.data?.message || "Erro ao atualizar rastreio");
+    throw error;
+  }
+},
+
+// Solicitar saque
+requestWithdrawal: async (amount) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.post("/financial/withdrawal/request", {
+      amount
+    });
+    toast.success("Saque solicitado com sucesso!");
+    set({ loading: false });
+    return response.data;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error.response?.data?.message || "Erro ao solicitar saque");
+    throw error;
+  }
+},
+
+// Histórico de saques
+getWithdrawalHistory: async (page = 1, status = null) => {
+  try {
+    const params = { page };
+    if (status) params.status = status;
+    
+    const response = await axiosBaseURL.get("/financial/withdrawal/history", { params });
+    return response.data;
+  } catch (error) {
+    toast.error(error.response?.data?.message || "Erro ao buscar saques");
+    return null;
+  }
+},
+
+forceLogout: () => {
+  set({ user: null, loading: false, checkingAuth: false });
+  localStorage.removeItem("user");
+  window.location.href = "/login";
+},
 }));
 
 // Axios interceptor para renovação automática de token

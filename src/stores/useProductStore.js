@@ -11,25 +11,25 @@ export const useProductStore = create((set, get) => ({
   setProducts: (products) => set({ products }),
 
   createProduct: async (productData) => {
-    try {
-      set({ loading: true });
-      if (!productData.image) {
-        set({ loading: false });
-        return toast.error("Please select an image");
-      }
-      const response = await axiosBaseURL.post("/products", productData);
-
-      // here we are using the prevState to update the products array and add the new product to it without mutating the state directly using the spread operator to copy the previous state and then add the new product to it using the response.data which is the new product that was created in the backend and returned to us as a response from the server after creating the product in the database and then we set the loading to false
-      set((prevState) => ({
-        products: [...prevState.products, response.data],
-        loading: false,
-      }));
-      toast.success("Product created successfully");
-    } catch (error) {
+  try {
+    set({ loading: true });
+    if (!productData.image) {
       set({ loading: false });
-      toast.error(error?.response?.data.error || "Failed to create product");
+      return toast.error("Por favor selecione uma imagem");
     }
-  },
+    // MUDANÇA: endpoint agora é /products/create
+    const response = await axiosBaseURL.post("/products/create", productData);
+    
+    set((prevState) => ({
+      products: [...prevState.products, response.data.product],
+      loading: false,
+    }));
+    toast.success("Produto criado com sucesso");
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error?.response?.data.message || "Erro ao criar produto");
+  }
+},
 
   fetchAllProducts: async (forceRefetch = false) => {
     // if (cacheChecking(get, forceRefetch)) return;
@@ -63,21 +63,23 @@ export const useProductStore = create((set, get) => ({
   },
 
   deleteProduct: async (productId) => {
-    set({ loading: true });
-    try {
-      await axiosBaseURL.delete(`/products/${productId}`);
-      set((prevState) => ({
-        products: prevState.products.filter(
-          (product) => product._id !== productId
-        ),
-        loading: false,
-      }));
-      toast.success("Product deleted successfully");
-    } catch (error) {
-      set({ loading: false });
-      toast.error(error?.response?.data.error || "Failed to delete product");
-    }
-  },
+  set({ loading: true });
+  try {
+    // MUDANÇA: endpoint agora é /products/delete/:id
+    await axiosBaseURL.delete(`/products/delete/${productId}`);
+    set((prevState) => ({
+      products: prevState.products.filter(
+        (product) => product._id !== productId
+      ),
+      loading: false,
+    }));
+    toast.success("Produto deletado com sucesso");
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error?.response?.data.message || "Erro ao deletar produto");
+  }
+},
+
   toggleFeaturedProduct: async (productId) => {
     set({ loading: true });
     try {
@@ -109,4 +111,92 @@ export const useProductStore = create((set, get) => ({
       console.log("Error fetching featured products:", error);
     }
   },
+  fetchMyProducts: async (filters = {}) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.get("/products/my-products", {
+      params: filters
+    });
+    set({ 
+      products: response?.data?.products, 
+      loading: false 
+    });
+    return response.data;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error?.response?.data.message || "Erro ao buscar produtos");
+  }
+},
+
+// Atualizar produto
+updateProduct: async (productId, productData) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.put(`/products/update/${productId}`, productData);
+    
+    set((prevState) => ({
+      products: prevState.products.map((product) =>
+        product._id === productId ? response.data.product : product
+      ),
+      loading: false,
+    }));
+    toast.success("Produto atualizado com sucesso");
+    return response.data.product;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error?.response?.data.message || "Erro ao atualizar produto");
+    throw error;
+  }
+},
+
+// Atualizar estoque
+updateStock: async (productId, stock) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.patch(`/products/stock/${productId}`, { stock });
+    
+    set((prevState) => ({
+      products: prevState.products.map((product) =>
+        product._id === productId ? response.data.product : product
+      ),
+      loading: false,
+    }));
+    toast.success("Estoque atualizado com sucesso");
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error?.response?.data.message || "Erro ao atualizar estoque");
+  }
+},
+
+// Buscar produtos de um vendedor específico
+fetchVendorProducts: async (vendorId, filters = {}) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.get(`/products/vendor/${vendorId}`, {
+      params: filters
+    });
+    set({ 
+      products: response?.data?.products, 
+      loading: false 
+    });
+    return response.data;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error?.response?.data.message || "Erro ao buscar produtos");
+  }
+},
+
+// Buscar detalhes de um produto
+fetchProductDetails: async (productId) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.get(`/products/details/${productId}`);
+    set({ loading: false });
+    return response.data;
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error?.response?.data.message || "Erro ao buscar produto");
+    return null;
+  }
+},
 }));

@@ -14,6 +14,8 @@ import { getUserData } from "../../utils/getUserData.js";
 import LoadingSpinner from "../LoadingSpinner/LoadingSpinner.jsx";
 import { useCartStore } from "../../stores/useCartStore.js";
 import ProfilePage from "../../pages/profile/index.jsx";
+import Footer from "../footer/Footer.jsx";
+import AnunciarPage from "../../pages/anunciar/index.jsx";
 
 const AppRoutes = () => {
   const { user, checkAuth, checkingAuth } = getUserData();
@@ -46,14 +48,7 @@ const AppRoutes = () => {
         <Route path="/" element={<HomePage />} />
         
         {/* user signup and login pages */}
-        <Route
-          path="/signup"
-          element={!user ? <SignUpPage /> : <Navigate to={"/"} />}
-        />
-        <Route
-          path="/login"
-          element={!user ? <LoginPage /> : <Navigate to={"/"} />}
-        />
+      
         
         {/* admin dashboard page */}
         <Route
@@ -85,8 +80,22 @@ const AppRoutes = () => {
           element={user ? <PurchaseCancelPage /> : <Navigate to="/login" />}
         />
         <Route path="/profile" element={<ProfilePage />} />
+          <Footer />
+           <Route
+          path="/signup"
+          element={!user ? <SignUpPage /> : <Navigate to={"/"} />}
+        />
+        <Route
+          path="/login"
+          element={!user ? <LoginPage /> : <Navigate to={"/"} />}
+        />
+        <Route path="/anunciar" element={<AnunciarPage />} />
       </Routes>
+      
+        
+       
     </div>
+   
   );
 };
 
