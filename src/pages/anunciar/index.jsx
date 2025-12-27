@@ -1,54 +1,102 @@
 import React, { useEffect, useState } from "react";
-import { User, Phone, FileText, Image as ImageIcon } from "lucide-react";
+import { User, Phone, FileText, CreditCard } from "lucide-react";
 import { motion } from "framer-motion";
 import { useUserStore } from "../../stores/useUserStore";
-import AuthVerification from "../../components/AnunciarSteps/AuthVerification";
-import PhoneVerification from "../../components/AnunciarSteps/PhoneVerification";
-//import CreateAdForm from "../../components/AnunciarSteps/CreateAdForm";
-//import AdImages from "../../components/AnunciarSteps/AdImages";
+import AuthVerification from "../../components/AnunciarSteps/AuthVerification.jsx";
+import PhoneVerification from "../../components/AnunciarSteps/PhoneVerification.jsx";
+import TermsAndRules from "../../components/AnunciarSteps/TermsAndRules.jsx";
+import PersonalDataForm from "../../components/AnunciarSteps/PersonalDataForm.jsx";
 
 const steps = [
   { id: "auth", label: "Conta", icon: User },
   { id: "phone", label: "Telefone", icon: Phone },
-  { id: "ad", label: "Anúncio", icon: FileText },
-  { id: "images", label: "Imagens", icon: ImageIcon },
+  { id: "terms", label: "Termos", icon: FileText },
+  { id: "personal", label: "Dados Pessoais", icon: CreditCard },
 ];
 
 const AnunciarPage = () => {
   const { user } = useUserStore();
   const [activeStep, setActiveStep] = useState("auth");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  
+  // ⚠️ MODO DE DESENVOLVIMENTO - Permite navegar livremente
+  const [devMode, setDevMode] = useState(false);
 
   useEffect(() => {
+    // No modo dev, permite navegar livremente
+    if (devMode) return;
+
     // Verificar qual step mostrar baseado nos dados do usuário
     if (!user) {
       setActiveStep("auth");
       return;
     }
 
-    if (!user.phone) {
+    if (!user.phone || !user.phoneVerified) {
       setActiveStep("phone");
       return;
     }
 
-    // Se já tem tudo, pode ir direto pro anúncio
-    setActiveStep("ad");
-  }, [user]);
+    // Se já tem tudo mas não aceitou termos, mostrar termos
+    if (!termsAccepted) {
+      setActiveStep("terms");
+      return;
+    }
+
+    // Se chegou aqui, pode preencher dados pessoais
+    setActiveStep("personal");
+  }, [user, termsAccepted, devMode]);
 
   const handleStepComplete = (nextStep) => {
     setActiveStep(nextStep);
   };
 
+  const isStepAccessible = (stepId) => {
+    // No modo dev, todos os steps são acessíveis
+    if (devMode) return true;
+
+    if (stepId === "auth") return true;
+    if (stepId === "phone") return !!user;
+    if (stepId === "terms") return user?.phone && user?.phoneVerified;
+    if (stepId === "personal") return user?.phone && user?.phoneVerified && termsAccepted;
+    return false; 
+  };
+
   return (
-    <section className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-purple-950 relative overflow-hidden">
+    <section className="min-h-screen bg-gradient-to-br mt-20 from-purple-900 via-purple-800 to-purple-950 relative overflow-hidden">
       <div className="relative z-10 container mx-auto px-4 py-8">
-        <motion.h1
-          className="text-4xl font-bold mb-8 text-white text-center"
+        {/* Toggle Modo Dev */}
+        <div className="absolute top-4 right-4">
+          <button
+            onClick={() => setDevMode(!devMode)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              devMode
+                ? "bg-yellow-500 text-black"
+                : "bg-white bg-opacity-10 text-white hover:bg-opacity-20"
+            }`}
+          >
+            {devMode ? "🔓 Modo Dev ON" : "🔒 Modo Dev OFF"}
+          </button>
+        </div>
+
+        <motion.div
           initial={{ opacity: 0, y: -40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
+          className="text-center mb-8"
         >
-          Criar Anúncio
-        </motion.h1>
+          <h1 className="text-4xl font-bold text-white mb-2">
+            Torne-se um Vendedor
+          </h1>
+          <p className="text-purple-200">
+            Complete os passos abaixo para começar a vender
+          </p>
+          {devMode && (
+            <p className="text-yellow-400 text-sm mt-2 font-semibold">
+              ⚠️ Modo Desenvolvimento: Navegação livre ativada
+            </p>
+          )}
+        </motion.div>
 
         {/* Steps Progress */}
         <motion.div
@@ -59,12 +107,9 @@ const AnunciarPage = () => {
         >
           {steps.map((step, index) => {
             const isActive = activeStep === step.id;
-            const isCompleted = steps.findIndex(s => s.id === activeStep) > index;
-            const isAccessible = 
-              step.id === "auth" || 
-              (step.id === "phone" && user) || 
-              (step.id === "ad" && user?.phone) ||
-              (step.id === "images" && user?.phone);
+            const currentIndex = steps.findIndex(s => s.id === activeStep);
+            const isCompleted = currentIndex > index;
+            const isAccessible = isStepAccessible(step.id);
 
             return (
               <button
@@ -75,7 +120,7 @@ const AnunciarPage = () => {
                   isActive
                     ? "bg-gradient-to-r from-pink-500 to-purple-600 text-white scale-105 shadow-xl"
                     : isCompleted
-                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg"
+                    ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-lg hover:scale-105"
                     : isAccessible
                     ? "bg-white bg-opacity-10 text-purple-200 hover:bg-opacity-20 shadow-md"
                     : "bg-gray-700 text-gray-500 cursor-not-allowed opacity-50"
@@ -95,15 +140,36 @@ const AnunciarPage = () => {
           key={activeStep}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.5 }}
         >
           {activeStep === "auth" && (
             <AuthVerification onComplete={() => handleStepComplete("phone")} />
           )}
+          
           {activeStep === "phone" && (
-            <PhoneVerification onComplete={() => handleStepComplete("ad")} />
+            <PhoneVerification onComplete={() => handleStepComplete("terms")} />
           )}
           
+          {activeStep === "terms" && (
+            <TermsAndRules 
+              onAccept={() => {
+                setTermsAccepted(true);
+                handleStepComplete("personal");
+              }}
+              onBack={() => handleStepComplete("phone")}
+            />
+          )}
+          
+          {activeStep === "personal" && (
+            <PersonalDataForm 
+              onComplete={() => {
+                // Redirecionar para página de sucesso ou dashboard
+                window.location.href = "/vendor/dashboard";
+              }}
+              onBack={() => handleStepComplete("terms")}
+            />
+          )}
         </motion.div>
       </div>
     </section>

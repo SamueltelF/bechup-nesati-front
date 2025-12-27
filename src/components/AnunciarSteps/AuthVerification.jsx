@@ -1,103 +1,186 @@
-import React from "react";
-import { Link } from "react-router-dom";
-import { User, LogOut } from "lucide-react";
+import React, { useState } from "react";
 import { motion } from "framer-motion";
+import { LogIn, UserPlus, Mail, Lock, User, Eye, EyeOff } from "lucide-react";
 import { useUserStore } from "../../stores/useUserStore";
+import toast from "react-hot-toast";
 
 const AuthVerification = ({ onComplete }) => {
-  const { user } = useUserStore();
+  const { login, signup, user } = useUserStore();
+  const [isLogin, setIsLogin] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: ""
+  });
 
-  // Se já estiver logado, mostrar confirmação
-  if (user) {
-    return (
-      <motion.div
-        className="max-w-2xl mx-auto"
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8 border border-green-400 border-opacity-30 shadow-2xl text-center">
-          <div className="w-20 h-20 bg-gradient-to-r from-green-400 to-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg animate-pulse">
-            <User className="text-white" size={40} />
-          </div>
-          
-          <h2 className="text-3xl font-bold mb-2 text-white">
-            Bem-vindo, {user.name}!
-          </h2>
-          <p className="text-purple-200 mb-6">
-            Sua conta está ativa e pronta para criar anúncios.
-          </p>
+  // Se já está logado, avança automaticamente
+  React.useEffect(() => {
+    if (user) {
+      onComplete();
+    }
+  }, [user, onComplete]);
 
-          <div className="bg-purple-900 bg-opacity-30 rounded-xl p-5 mb-6 text-left">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-purple-300 text-sm font-medium">📧 Email:</span>
-              <span className="text-white font-semibold">{user.email}</span>
-            </div>
-            <div className="h-px bg-purple-400 bg-opacity-20 mb-3"></div>
-            <div className="flex items-center justify-between">
-              <span className="text-purple-300 text-sm font-medium">👤 Nome:</span>
-              <span className="text-white font-semibold">{user.name}</span>
-            </div>
-          </div>
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
 
-          <button
-            onClick={onComplete}
-            className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            Continuar →
-          </button>
-        </div>
-      </motion.div>
-    );
-  }
+    try {
+      if (isLogin) {
+        // Login
+        await login({ 
+          identifier: formData.email, 
+          password: formData.password 
+        });
+        toast.success("Login realizado com sucesso!");
+        onComplete();
+      } else {
+        // Signup
+        if (formData.password !== formData.confirmPassword) {
+          toast.error("As senhas não coincidem");
+          setLoading(false);
+          return;
+        }
 
-  // Se não estiver logado, mostrar opções de login/cadastro
+        if (formData.password.length < 6) {
+          toast.error("A senha deve ter no mínimo 6 caracteres");
+          setLoading(false);
+          return;
+        }
+
+        await signup({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password
+        });
+        toast.success("Conta criada com sucesso!");
+        onComplete();
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Erro ao processar requisição");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+
   return (
     <motion.div
-      className="max-w-4xl mx-auto"
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.5 }}
+      className="max-w-md mx-auto"
     >
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Login */}
-        <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8 border border-purple-400 border-opacity-30 hover:border-opacity-60 transition-all shadow-xl text-center">
-          <div className="w-20 h-20 bg-gradient-to-r from-purple-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <User className="text-white" size={40} />
-          </div>
-          
-          <h3 className="text-2xl font-bold mb-3 text-white">Já tenho conta!</h3>
-          <p className="text-purple-200 mb-6">
-            Faça login para criar seu anúncio e começar a vender na Nesati.
-          </p>
-
-          <Link
-            to="/login"
-            state={{ from: "/anunciar" }}
-            className="block w-full bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            Fazer Login
-          </Link>
+      <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-white border-opacity-20">
+        <div className="flex justify-center mb-6">
+          {isLogin ? (
+            <LogIn className="h-16 w-16 text-purple-300" />
+          ) : (
+            <UserPlus className="h-16 w-16 text-purple-300" />
+          )}
         </div>
 
-        {/* Cadastro */}
-        <div className="bg-white bg-opacity-10 backdrop-blur-lg rounded-2xl p-8 border border-pink-400 border-opacity-30 hover:border-opacity-60 transition-all shadow-xl text-center">
-          <div className="w-20 h-20 bg-gradient-to-r from-pink-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-            <LogOut className="text-white" size={40} />
-          </div>
-          
-          <h3 className="text-2xl font-bold mb-3 text-white">Criar nova conta</h3>
-          <p className="text-purple-200 mb-6">
-            Ainda não tem conta? Crie agora e comece a vender seus produtos.
-          </p>
+        <h2 className="text-2xl font-bold text-center text-white mb-2">
+          {isLogin ? "Entre na sua conta" : "Crie sua conta"}
+        </h2>
+        <p className="text-center text-purple-200 mb-6">
+          {isLogin 
+            ? "Para continuar, faça login na sua conta" 
+            : "Preencha os dados para criar sua conta"}
+        </p>
 
-          <Link
-            to="/signup"
-            state={{ from: "/anunciar" }}
-            className="block w-full bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-300 h-5 w-5" />
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="Nome completo"
+                required
+                className="w-full pl-12 pr-4 py-3 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          )}
+
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-300 h-5 w-5" />
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              placeholder="Email"
+              required
+              className="w-full pl-12 pr-4 py-3 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-300 h-5 w-5" />
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Senha"
+              required
+              className="w-full pl-12 pr-12 py-3 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-300 hover:text-white"
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
+
+          {!isLogin && (
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-300 h-5 w-5" />
+              <input
+                type={showPassword ? "text" : "password"}
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirmar senha"
+                required
+                className="w-full pl-12 pr-4 py-3 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-semibold rounded-lg hover:from-pink-600 hover:to-purple-700 transition-all duration-300 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Criar Conta
-          </Link>
+            {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-purple-200 hover:text-white transition-colors duration-200"
+          >
+            {isLogin ? (
+              <>Não tem uma conta? <span className="font-semibold">Criar conta</span></>
+            ) : (
+              <>Já tem uma conta? <span className="font-semibold">Fazer login</span></>
+            )}
+          </button>
         </div>
       </div>
     </motion.div>

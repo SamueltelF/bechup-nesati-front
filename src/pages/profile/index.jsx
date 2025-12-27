@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Camera, User, Mail, Phone, Shield, Lock, Save, Eye, EyeOff, Trash2, AtSign } from "lucide-react";
+import { Camera, User, Mail, Phone, Shield, Lock, Save, Eye, EyeOff, Trash2, CheckCircle, XCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useUserStore } from "../../stores/useUserStore";
 import { toast } from "react-hot-toast";
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const { 
     user, 
     loading,
@@ -41,13 +43,11 @@ const ProfilePage = () => {
   const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validar tamanho (máx 5MB)
       if (file.size > 5 * 1024 * 1024) {
         toast.error("Imagem muito grande. Máximo 5MB");
         return;
       }
 
-      // Validar tipo
       if (!file.type.startsWith('image/')) {
         toast.error("Arquivo deve ser uma imagem");
         return;
@@ -57,7 +57,6 @@ const ProfilePage = () => {
       
       try {
         await updateProfilePicture(file);
-        // A foto já foi atualizada no store, React vai re-renderizar automaticamente
       } catch (error) {
         console.error("Erro ao fazer upload:", error);
       } finally {
@@ -74,7 +73,6 @@ const ProfilePage = () => {
     setIsUpdating(prev => ({ ...prev, picture: true }));
     try {
       await deleteProfilePicture();
-      // A foto já foi removida do store, React vai re-renderizar automaticamente
     } catch (error) {
       console.error("Erro ao deletar foto:", error);
     } finally {
@@ -157,6 +155,10 @@ const ProfilePage = () => {
     }
   };
 
+  const handleVerifyEmail = () => {
+    navigate("/verify-email");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 pt-24 pb-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -180,7 +182,7 @@ const ProfilePage = () => {
                       src={user.profilePicture} 
                       alt="Profile" 
                       className="w-full h-full object-cover"
-                      key={user.profilePicture} // Force re-render quando URL mudar
+                      key={user.profilePicture}
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-400 to-pink-400">
@@ -225,7 +227,7 @@ const ProfilePage = () => {
             {/* Conteúdo */}
             <div className="p-8 space-y-6">
               
-              {/* Tipo de Conta e Username */}
+              {/* Tipo de Conta */}
               <div className="grid grid-cols-1 gap-4">
                 <div className="bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-xl p-4 border border-purple-400/30 flex items-center gap-3">
                   <Shield className="text-pink-400" size={24} />
@@ -234,6 +236,44 @@ const ProfilePage = () => {
                     <p className="text-lg font-bold text-white uppercase">
                       {user?.role === "admin" ? "Administrador" : "Cliente"}
                     </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Status de Verificações */}
+              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-400/30 rounded-xl p-4">
+                <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                  <Shield size={18} className="text-blue-400" />
+                  Status de Segurança
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300 text-sm">Email Verificado</span>
+                    {user?.emailVerified ? (
+                      <span className="flex items-center gap-1 text-green-400 text-sm font-medium">
+                        <CheckCircle size={16} />
+                        Verificado
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-red-400 text-sm font-medium">
+                        <XCircle size={16} />
+                        Não verificado
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-300 text-sm">Telefone Verificado</span>
+                    {user?.phoneVerified ? (
+                      <span className="flex items-center gap-1 text-green-400 text-sm font-medium">
+                        <CheckCircle size={16} />
+                        Verificado
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-red-400 text-sm font-medium">
+                        <XCircle size={16} />
+                        Não verificado
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -275,13 +315,14 @@ const ProfilePage = () => {
                 <label className="flex items-center gap-2 text-white font-medium mb-2">
                   <Mail size={18} className="text-pink-400" />
                   Email
-                  {user?.emailVerified && (
-                    <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                  {user?.emailVerified ? (
+                    <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
+                      <CheckCircle size={12} />
                       Verificado
                     </span>
-                  )}
-                  {!user?.emailVerified && user?.email && (
-                    <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+                  ) : (
+                    <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full flex items-center gap-1">
+                      <XCircle size={12} />
                       Não verificado
                     </span>
                   )}
@@ -297,6 +338,18 @@ const ProfilePage = () => {
                       placeholder="seu@email.com"
                     />
                   </div>
+                  
+                  {/* Botão de Verificar Email */}
+                  {!user?.emailVerified && user?.email && (
+                    <button
+                      type="button"
+                      onClick={handleVerifyEmail}
+                      className="w-full px-4 py-3 bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <Mail size={18} />
+                      Verificar Email Agora
+                    </button>
+                  )}
                   
                   {formData.email !== user?.email && (
                     <div className="flex gap-2">
@@ -347,16 +400,17 @@ const ProfilePage = () => {
                 <label className="flex items-center gap-2 text-white font-medium mb-2">
                   <Phone size={18} className="text-pink-400" />
                   Telefone
-                  {user?.phoneVerified && (
-                    <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
+                  {user?.phoneVerified ? (
+                    <span className="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded-full flex items-center gap-1">
+                      <CheckCircle size={12} />
                       Verificado
                     </span>
-                  )}
-                  {!user?.phoneVerified && user?.phone && (
-                    <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+                  ) : user?.phone ? (
+                    <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full flex items-center gap-1">
+                      <XCircle size={12} />
                       Não verificado
                     </span>
-                  )}
+                  ) : null}
                 </label>
                 <div className="flex gap-2">
                   <input

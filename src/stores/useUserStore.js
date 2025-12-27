@@ -7,7 +7,10 @@ export const useUserStore = create((set, get) => ({
   loading: false,
   checkingAuth: false,
 
-  // Signup sem username
+  // ============================================
+  // AUTENTICAÇÃO
+  // ============================================
+
   signUp: async ({ name, email, password, confirmPassword, phone }) => {
     set({ loading: true });
 
@@ -33,25 +36,22 @@ export const useUserStore = create((set, get) => ({
       localStorage.setItem("user", JSON.stringify(response?.data));
     } catch (error) {
       set({ loading: false });
-      if (error?.response && error?.response?.status === 429) {
+      if (error?.response?.status === 429) {
         toast.error(
           error?.response?.data?.message ||
             "Muitas tentativas. Por favor, tente novamente mais tarde."
         );
       } else {
-        toast.error(
-          error.response?.data?.message || "Erro ao criar conta"
-        );
+        toast.error(error.response?.data?.message || "Erro ao criar conta");
       }
     }
   },
 
-  // Login agora aceita apenas email
   login: async (email, password) => {
     set({ loading: true });
     try {
       const response = await axiosBaseURL.post("/auth/login", {
-        identifier: email, // O backend espera 'identifier'
+        identifier: email,
         password,
       });
 
@@ -60,54 +60,53 @@ export const useUserStore = create((set, get) => ({
       toast.success("Login realizado com sucesso!");
     } catch (error) {
       set({ loading: false });
-      if (error.response && error.response.status === 429) {
+      if (error.response?.status === 429) {
         toast.error(
           error?.response?.data?.message ||
             "Muitas tentativas. Por favor, tente novamente mais tarde."
         );
       } else {
-        toast.error(
-          error.response?.data?.message || "Credenciais inválidas"
-        );
+        toast.error(error.response?.data?.message || "Credenciais inválidas");
       }
     }
   },
 
   checkAuth: async () => {
-  set({ checkingAuth: true, loading: true });
+    set({ checkingAuth: true, loading: true });
 
-  try {
-    const response = await axiosBaseURL.get("/auth/profile");
-    set({ user: response?.data?.user, checkingAuth: false, loading: false });
-    localStorage.setItem("user", JSON.stringify(response?.data?.user));
-  } catch (error) {
-    // Limpar completamente quando falhar
-    set({ checkingAuth: false, user: null, loading: false });
-    localStorage.removeItem("user");
+    try {
+      const response = await axiosBaseURL.get("/auth/profile");
+      set({ user: response?.data?.user, checkingAuth: false, loading: false });
+      localStorage.setItem("user", JSON.stringify(response?.data?.user));
+    } catch (error) {
+      set({ checkingAuth: false, user: null, loading: false });
+      localStorage.removeItem("user");
 
-    console.log("checkAuth error:", error.message);
-    
-    // Não mostrar toast se for erro esperado
-    if (error.response?.data?.code !== "USER_DELETED") {
-      toast.error("Sessão expirada");
+      console.log("checkAuth error:", error.message);
+      
+      if (error.response?.data?.code !== "USER_DELETED") {
+        toast.error("Sessão expirada");
+      }
     }
-  }
-},
+  },
 
   logout: async () => {
     set({ loading: true });
     try {
-      await axiosBaseURL.post("/auth/logout"); // Mudado para POST
+      await axiosBaseURL.post("/auth/logout");
       set({ user: null, loading: false });
       localStorage.removeItem("user");
       toast.success("Logout realizado com sucesso!");
     } catch (error) {
       set({ loading: false });
-      toast.error(
-        error.response?.data.message ||
-          "Ocorreu um erro na função de logout na loja do usuário"
-      );
+      toast.error(error.response?.data?.message || "Erro ao fazer logout");
     }
+  },
+
+  forceLogout: () => {
+    set({ user: null, loading: false, checkingAuth: false });
+    localStorage.removeItem("user");
+    window.location.href = "/login";
   },
 
   refreshToken: async () => {
@@ -120,11 +119,23 @@ export const useUserStore = create((set, get) => ({
       return response?.data;
     } catch (error) {
       set({ loading: false, checkingAuth: false });
-      toast.error(
-        error.response?.data.message ||
-          "Ocorreu um erro na função refreshToken no armazenamento do usuário"
-      );
+      toast.error(error.response?.data?.message || "Erro ao renovar token");
       throw error;
+    }
+  },
+
+  // ============================================
+  // PERFIL - FOTO E DADOS BÁSICOS
+  // ============================================
+
+  refreshUser: async () => {
+    try {
+      const response = await axiosBaseURL.get("/auth/profile");
+      const userData = response?.data?.user;
+      set({ user: userData });
+      localStorage.setItem("user", JSON.stringify(userData));
+    } catch (error) {
+      console.error("Erro ao atualizar perfil:", error);
     }
   },
 
@@ -189,10 +200,10 @@ export const useUserStore = create((set, get) => ({
     set({ loading: true });
     try {
       const response = await axiosBaseURL.put("/auth/profile/name", {
-        newName,
+        newName: newName.trim(),
       });
 
-      const updatedUser = { ...get().user, name: newName };
+      const updatedUser = { ...get().user, name: newName.trim() };
       set({ user: updatedUser, loading: false });
       localStorage.setItem("user", JSON.stringify(updatedUser));
 
@@ -200,6 +211,7 @@ export const useUserStore = create((set, get) => ({
     } catch (error) {
       set({ loading: false });
       toast.error(error.response?.data?.message || "Erro ao atualizar nome");
+      throw error;
     }
   },
 
@@ -207,14 +219,14 @@ export const useUserStore = create((set, get) => ({
     set({ loading: true });
     try {
       const response = await axiosBaseURL.put("/auth/profile/email", {
-        newEmail,
+        newEmail: newEmail.trim().toLowerCase(),
         password,
       });
 
       const updatedUser = { 
         ...get().user, 
-        email: newEmail, 
-        emailVerified: false
+        email: response.data.email || newEmail.trim().toLowerCase(),
+        emailVerified: response.data.emailVerified || false
       };
       set({ user: updatedUser, loading: false });
       localStorage.setItem("user", JSON.stringify(updatedUser));
@@ -223,30 +235,32 @@ export const useUserStore = create((set, get) => ({
     } catch (error) {
       set({ loading: false });
       toast.error(error.response?.data?.message || "Erro ao atualizar email");
+      throw error;
     }
   },
 
-  updatePhone: async (newPhone) => {
-    set({ loading: true });
-    try {
-      const response = await axiosBaseURL.put("/auth/profile/phone", {
-        newPhone,
-      });
+ updatePhone: async (newPhone) => {
+  set({ loading: true });
+  try {
+    const response = await axiosBaseURL.put("/auth/update-phone", {
+      newPhone: newPhone ? newPhone.trim() : "",
+    });
 
-      const updatedUser = { 
-        ...get().user, 
-        phone: newPhone || null, 
-        phoneVerified: false 
-      };
-      set({ user: updatedUser, loading: false });
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+    const updatedUser = { 
+      ...get().user, 
+      phone: response.data.phone || newPhone || null,
+      phoneVerified: response.data.phoneVerified || false
+    };
+    set({ user: updatedUser, loading: false });
+    localStorage.setItem("user", JSON.stringify(updatedUser));
 
-      toast.success("Número atualizado com sucesso");
-    } catch (error) {
-      set({ loading: false });
-      toast.error(error.response?.data?.message || "Erro ao atualizar número");
-    }
-  },
+    toast.success("Número atualizado com sucesso");
+  } catch (error) {
+    set({ loading: false });
+    toast.error(error.response?.data?.message || "Erro ao atualizar número");
+    throw error;
+  }
+},
 
   updatePassword: async (currentPassword, newPassword, confirmNewPassword) => {
     set({ loading: true });
@@ -267,10 +281,64 @@ export const useUserStore = create((set, get) => ({
     } catch (error) {
       set({ loading: false });
       toast.error(error.response?.data?.message || "Erro ao atualizar senha");
+      throw error;
     }
   },
 
-  // Funções adicionais para os novos campos do schema
+  // ============================================
+  // VERIFICAÇÃO DE EMAIL E TELEFONE
+  // ============================================
+
+  sendEmailVerification: async () => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.post("/auth/send-email-verification");
+      set({ loading: false });
+      toast.success(response.data.message);
+      return response.data;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao enviar código");
+      throw error;
+    }
+  },
+
+  verifyEmailCode: async (code) => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.post("/auth/verify-email", { code });
+      
+      const updatedUser = { ...get().user, emailVerified: true };
+      set({ user: updatedUser, loading: false });
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      
+      toast.success(response.data.message);
+      return response.data;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao verificar código");
+      throw error;
+    }
+  },
+
+  resendEmailVerification: async () => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.post("/auth/resend-email-verification");
+      set({ loading: false });
+      toast.success(response.data.message);
+      return response.data;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao reenviar código");
+      throw error;
+    }
+  },
+
+  // ============================================
+  // DADOS PESSOAIS ADICIONAIS
+  // ============================================
+
   updatePersonalData: async (data) => {
     set({ loading: true });
     try {
@@ -289,6 +357,7 @@ export const useUserStore = create((set, get) => ({
     } catch (error) {
       set({ loading: false });
       toast.error(error.response?.data?.message || "Erro ao atualizar dados pessoais");
+      throw error;
     }
   },
 
@@ -347,285 +416,318 @@ export const useUserStore = create((set, get) => ({
       toast.error(error.response?.data?.message || "Erro ao buscar saldo");
     }
   },
+
+  // ============================================
+  // PERFIL DE VENDEDOR (ADMIN PROFILE)
+  // ============================================
+
   createAdminProfile: async (data) => {
-  set({ loading: true });
-  try {
-    const response = await axiosBaseURL.post("/admin-profile/create", data);
-    
-    toast.success("Perfil de vendedor criado com sucesso!");
-    set({ loading: false });
-    return response.data;
-  } catch (error) {
-    set({ loading: false });
-    toast.error(error.response?.data?.message || "Erro ao criar perfil de vendedor");
-    throw error;
-  }
-},
-
-// Buscar perfil de vendedor
-getAdminProfile: async () => {
-  set({ loading: true });
-  try {
-    const response = await axiosBaseURL.get("/admin-profile/me");
-    set({ loading: false });
-    return response.data.adminProfile;
-  } catch (error) {
-    set({ loading: false });
-    if (error.response?.status !== 404) {
-      toast.error(error.response?.data?.message || "Erro ao buscar perfil");
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.post("/admin-profile/create", data);
+      toast.success("Perfil de vendedor criado com sucesso!");
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao criar perfil de vendedor");
+      throw error;
     }
-    return null;
-  }
-},
+  },
 
-// Atualizar perfil de vendedor
-updateAdminProfile: async (data) => {
+  getAdminProfile: async () => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.get("/admin-profile/me");
+      set({ loading: false });
+      return response.data.adminProfile;
+    } catch (error) {
+      set({ loading: false });
+      if (error.response?.status !== 404) {
+        toast.error(error.response?.data?.message || "Erro ao buscar perfil");
+      }
+      return null;
+    }
+  },
+
+  updateAdminProfile: async (data) => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.put("/admin-profile/update", data);
+      toast.success("Perfil atualizado com sucesso!");
+      set({ loading: false });
+      return response.data.adminProfile;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao atualizar perfil");
+      throw error;
+    }
+  },
+
+  uploadAdminPersonalPhoto: async (imageFile) => {
+    set({ loading: true });
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(imageFile);
+      
+      return new Promise((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const response = await axiosBaseURL.post("/admin-profile/upload/personal-photo", {
+              image: reader.result,
+            });
+            
+            set({ loading: false });
+            toast.success("Foto pessoal enviada com sucesso!");
+            resolve(response.data);
+          } catch (error) {
+            set({ loading: false });
+            toast.error(error.response?.data?.message || "Erro ao enviar foto");
+            reject(error);
+          }
+        };
+        reader.onerror = () => {
+          set({ loading: false });
+          toast.error("Erro ao processar imagem");
+          reject(new Error("Erro ao processar imagem"));
+        };
+      });
+    } catch (error) {
+      set({ loading: false });
+      toast.error("Erro ao enviar foto");
+    }
+  },
+
+  uploadRgFront: async (imageFile) => {
+    set({ loading: true });
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(imageFile);
+      
+      return new Promise((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const response = await axiosBaseURL.post("/admin-profile/upload/rg-front", {
+              image: reader.result,
+            });
+            
+            set({ loading: false });
+            toast.success("RG (frente) enviado com sucesso!");
+            resolve(response.data);
+          } catch (error) {
+            set({ loading: false });
+            toast.error(error.response?.data?.message || "Erro ao enviar RG");
+            reject(error);
+          }
+        };
+      });
+    } catch (error) {
+      set({ loading: false });
+      toast.error("Erro ao enviar RG");
+    }
+  },
+
+  uploadRgBack: async (imageFile) => {
+    set({ loading: true });
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(imageFile);
+      
+      return new Promise((resolve, reject) => {
+        reader.onload = async () => {
+          try {
+            const response = await axiosBaseURL.post("/admin-profile/upload/rg-back", {
+              image: reader.result,
+            });
+            
+            set({ loading: false });
+            toast.success("RG (verso) enviado com sucesso!");
+            resolve(response.data);
+          } catch (error) {
+            set({ loading: false });
+            toast.error(error.response?.data?.message || "Erro ao enviar RG");
+            reject(error);
+          }
+        };
+      });
+    } catch (error) {
+      set({ loading: false });
+      toast.error("Erro ao enviar RG");
+    }
+  },
+
+  submitForReview: async () => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.post("/admin-profile/submit-review");
+      toast.success("Perfil enviado para análise!");
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao enviar para análise");
+      throw error;
+    }
+  },
+
+  // ============================================
+  // FUNÇÕES FINANCEIRAS
+  // ============================================
+
+  getFinancialDashboard: async () => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.get("/financial/dashboard");
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao buscar dashboard");
+      return null;
+    }
+  },
+
+  getVendorBalance: async () => {
+    try {
+      const response = await axiosBaseURL.get("/financial/balance");
+      return response.data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Erro ao buscar saldo");
+      return null;
+    }
+  },
+
+  getBalanceHistory: async (page = 1, type = null) => {
+    try {
+      const params = { page };
+      if (type) params.type = type;
+      
+      const response = await axiosBaseURL.get("/financial/balance/history", { params });
+      return response.data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Erro ao buscar histórico");
+      return null;
+    }
+  },
+
+  getMySales: async (page = 1, filters = {}) => {
+    try {
+      const response = await axiosBaseURL.get("/financial/sales", { 
+        params: { page, ...filters } 
+      });
+      return response.data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Erro ao buscar vendas");
+      return null;
+    }
+  },
+
+  getSaleDetails: async (orderId) => {
+    try {
+      const response = await axiosBaseURL.get(`/financial/sales/${orderId}`);
+      return response.data.sale;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Erro ao buscar venda");
+      return null;
+    }
+  },
+
+  updateTrackingCode: async (orderId, trackingCode) => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.put(`/financial/sales/${orderId}/tracking`, {
+        trackingCode
+      });
+      toast.success("Código de rastreio atualizado!");
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao atualizar rastreio");
+      throw error;
+    }
+  },
+
+  requestWithdrawal: async (amount) => {
+    set({ loading: true });
+    try {
+      const response = await axiosBaseURL.post("/financial/withdrawal/request", {
+        amount
+      });
+      toast.success("Saque solicitado com sucesso!");
+      set({ loading: false });
+      return response.data;
+    } catch (error) {
+      set({ loading: false });
+      toast.error(error.response?.data?.message || "Erro ao solicitar saque");
+      throw error;
+    }
+  },
+
+  getWithdrawalHistory: async (page = 1, status = null) => {
+    try {
+      const params = { page };
+      if (status) params.status = status;
+      
+      const response = await axiosBaseURL.get("/financial/withdrawal/history", { params });
+      return response.data;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Erro ao buscar saques");
+      return null;
+    }
+  },
+///SMS VERIFICAÇÃO
+  sendPhoneVerification: async () => {
   set({ loading: true });
   try {
-    const response = await axiosBaseURL.put("/admin-profile/update", data);
-    toast.success("Perfil atualizado com sucesso!");
+    const response = await axiosBaseURL.post("/auth/send-phone-verification");
     set({ loading: false });
-    return response.data.adminProfile;
+    toast.success(response.data.message);
+    return response.data;
   } catch (error) {
     set({ loading: false });
-    toast.error(error.response?.data?.message || "Erro ao atualizar perfil");
+    toast.error(error.response?.data?.message || "Erro ao enviar código SMS");
     throw error;
   }
 },
 
-// Upload foto pessoal do vendedor
-uploadAdminPersonalPhoto: async (imageFile) => {
+verifyPhoneCode: async (code) => {
   set({ loading: true });
   try {
-    const reader = new FileReader();
-    reader.readAsDataURL(imageFile);
+    const response = await axiosBaseURL.post("/auth/verify-phone", { code });
     
-    return new Promise((resolve, reject) => {
-      reader.onload = async () => {
-        try {
-          const response = await axiosBaseURL.post("/admin-profile/upload/personal-photo", {
-            image: reader.result,
-          });
-          
-          set({ loading: false });
-          toast.success("Foto pessoal enviada com sucesso!");
-          resolve(response.data);
-        } catch (error) {
-          set({ loading: false });
-          toast.error(error.response?.data?.message || "Erro ao enviar foto");
-          reject(error);
-        }
-      };
-      reader.onerror = () => {
-        set({ loading: false });
-        toast.error("Erro ao processar imagem");
-        reject(new Error("Erro ao processar imagem"));
-      };
-    });
-  } catch (error) {
-    set({ loading: false });
-    toast.error("Erro ao enviar foto");
-  }
-},
-
-// Upload RG frente
-uploadRgFront: async (imageFile) => {
-  set({ loading: true });
-  try {
-    const reader = new FileReader();
-    reader.readAsDataURL(imageFile);
+    const updatedUser = { ...get().user, phoneVerified: true };
+    set({ user: updatedUser, loading: false });
+    localStorage.setItem("user", JSON.stringify(updatedUser));
     
-    return new Promise((resolve, reject) => {
-      reader.onload = async () => {
-        try {
-          const response = await axiosBaseURL.post("/admin-profile/upload/rg-front", {
-            image: reader.result,
-          });
-          
-          set({ loading: false });
-          toast.success("RG (frente) enviado com sucesso!");
-          resolve(response.data);
-        } catch (error) {
-          set({ loading: false });
-          toast.error(error.response?.data?.message || "Erro ao enviar RG");
-          reject(error);
-        }
-      };
-    });
-  } catch (error) {
-    set({ loading: false });
-    toast.error("Erro ao enviar RG");
-  }
-},
-
-// Upload RG verso
-uploadRgBack: async (imageFile) => {
-  set({ loading: true });
-  try {
-    const reader = new FileReader();
-    reader.readAsDataURL(imageFile);
-    
-    return new Promise((resolve, reject) => {
-      reader.onload = async () => {
-        try {
-          const response = await axiosBaseURL.post("/admin-profile/upload/rg-back", {
-            image: reader.result,
-          });
-          
-          set({ loading: false });
-          toast.success("RG (verso) enviado com sucesso!");
-          resolve(response.data);
-        } catch (error) {
-          set({ loading: false });
-          toast.error(error.response?.data?.message || "Erro ao enviar RG");
-          reject(error);
-        }
-      };
-    });
-  } catch (error) {
-    set({ loading: false });
-    toast.error("Erro ao enviar RG");
-  }
-},
-
-// Submeter para análise
-submitForReview: async () => {
-  set({ loading: true });
-  try {
-    const response = await axiosBaseURL.post("/admin-profile/submit-review");
-    toast.success("Perfil enviado para análise!");
-    set({ loading: false });
+    toast.success(response.data.message);
     return response.data;
   } catch (error) {
     set({ loading: false });
-    toast.error(error.response?.data?.message || "Erro ao enviar para análise");
+    toast.error(error.response?.data?.message || "Erro ao verificar código");
     throw error;
   }
 },
 
-// ============================================
-// FUNÇÕES FINANCEIRAS
-// ============================================
-
-// Dashboard
-getFinancialDashboard: async () => {
+resendPhoneVerification: async () => {
   set({ loading: true });
   try {
-    const response = await axiosBaseURL.get("/financial/dashboard");
+    const response = await axiosBaseURL.post("/auth/resend-phone-verification");
     set({ loading: false });
-    return response.data;
-  } catch (error) {
-    set({ loading: false });
-    toast.error(error.response?.data?.message || "Erro ao buscar dashboard");
-    return null;
-  }
-},
-
-// Saldo
-getVendorBalance: async () => {
-  try {
-    const response = await axiosBaseURL.get("/financial/balance");
-    return response.data;
-  } catch (error) {
-    toast.error(error.response?.data?.message || "Erro ao buscar saldo");
-    return null;
-  }
-},
-
-// Histórico de saldo
-getBalanceHistory: async (page = 1, type = null) => {
-  try {
-    const params = { page };
-    if (type) params.type = type;
-    
-    const response = await axiosBaseURL.get("/financial/balance/history", { params });
-    return response.data;
-  } catch (error) {
-    toast.error(error.response?.data?.message || "Erro ao buscar histórico");
-    return null;
-  }
-},
-
-// Vendas
-getMySales: async (page = 1, filters = {}) => {
-  try {
-    const response = await axiosBaseURL.get("/financial/sales", { 
-      params: { page, ...filters } 
-    });
-    return response.data;
-  } catch (error) {
-    toast.error(error.response?.data?.message || "Erro ao buscar vendas");
-    return null;
-  }
-},
-
-// Detalhes de uma venda
-getSaleDetails: async (orderId) => {
-  try {
-    const response = await axiosBaseURL.get(`/financial/sales/${orderId}`);
-    return response.data.sale;
-  } catch (error) {
-    toast.error(error.response?.data?.message || "Erro ao buscar venda");
-    return null;
-  }
-},
-
-// Atualizar código de rastreio
-updateTrackingCode: async (orderId, trackingCode) => {
-  set({ loading: true });
-  try {
-    const response = await axiosBaseURL.put(`/financial/sales/${orderId}/tracking`, {
-      trackingCode
-    });
-    toast.success("Código de rastreio atualizado!");
-    set({ loading: false });
+    toast.success(response.data.message);
     return response.data;
   } catch (error) {
     set({ loading: false });
-    toast.error(error.response?.data?.message || "Erro ao atualizar rastreio");
+    toast.error(error.response?.data?.message || "Erro ao reenviar código");
     throw error;
   }
-},
-
-// Solicitar saque
-requestWithdrawal: async (amount) => {
-  set({ loading: true });
-  try {
-    const response = await axiosBaseURL.post("/financial/withdrawal/request", {
-      amount
-    });
-    toast.success("Saque solicitado com sucesso!");
-    set({ loading: false });
-    return response.data;
-  } catch (error) {
-    set({ loading: false });
-    toast.error(error.response?.data?.message || "Erro ao solicitar saque");
-    throw error;
-  }
-},
-
-// Histórico de saques
-getWithdrawalHistory: async (page = 1, status = null) => {
-  try {
-    const params = { page };
-    if (status) params.status = status;
-    
-    const response = await axiosBaseURL.get("/financial/withdrawal/history", { params });
-    return response.data;
-  } catch (error) {
-    toast.error(error.response?.data?.message || "Erro ao buscar saques");
-    return null;
-  }
-},
-
-forceLogout: () => {
-  set({ user: null, loading: false, checkingAuth: false });
-  localStorage.removeItem("user");
-  window.location.href = "/login";
 },
 }));
 
-// Axios interceptor para renovação automática de token
+// ============================================
+// AXIOS INTERCEPTOR
+// ============================================
+
 let refreshingPromise = null;
 
 axiosBaseURL.interceptors.response.use(
@@ -633,8 +735,10 @@ axiosBaseURL.interceptors.response.use(
 
   async (error) => {
     const originalRequest = error.config;
+    
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
+      
       try {
         if (refreshingPromise) {
           await refreshingPromise;
@@ -647,10 +751,15 @@ axiosBaseURL.interceptors.response.use(
 
         return axiosBaseURL(originalRequest);
       } catch (refreshError) {
-        useUserStore.getState().logout();
+        useUserStore.getState().forceLogout();
         return Promise.reject(refreshError);
       }
     }
+    
     return Promise.reject(error);
   }
 );
+
+
+
+
