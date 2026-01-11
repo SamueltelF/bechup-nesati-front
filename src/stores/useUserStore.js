@@ -48,28 +48,29 @@ export const useUserStore = create((set, get) => ({
   },
 
   login: async (email, password) => {
-    set({ loading: true });
-    try {
-      const response = await axiosBaseURL.post("/auth/login", {
-        identifier: email,
-        password,
-      });
+  set({ loading: true });
+  try {
+    // ✅ CORRIGIDO: Envia "identifier" como o backend espera
+    const response = await axiosBaseURL.post("/auth/login", {
+      identifier: email,  // Backend espera "identifier", não "email"
+      password,
+    });
 
-      set({ user: response?.data?.user, loading: false });
-      localStorage.setItem("user", JSON.stringify(response?.data?.user));
-      toast.success("Login realizado com sucesso!");
-    } catch (error) {
-      set({ loading: false });
-      if (error.response?.status === 429) {
-        toast.error(
-          error?.response?.data?.message ||
-            "Muitas tentativas. Por favor, tente novamente mais tarde."
-        );
-      } else {
-        toast.error(error.response?.data?.message || "Credenciais inválidas");
-      }
+    set({ user: response?.data?.user, loading: false });
+    localStorage.setItem("user", JSON.stringify(response?.data?.user));
+    toast.success("Login realizado com sucesso!");
+  } catch (error) {
+    set({ loading: false });
+    if (error.response?.status === 429) {
+      toast.error(
+        error?.response?.data?.message ||
+          "Muitas tentativas. Por favor, tente novamente mais tarde."
+      );
+    } else {
+      toast.error(error.response?.data?.message || "Credenciais inválidas");
     }
-  },
+  }
+},
 
   checkAuth: async () => {
     set({ checkingAuth: true, loading: true });
