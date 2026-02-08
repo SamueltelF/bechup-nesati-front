@@ -80,25 +80,29 @@ const SignUpPage = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
+  // Validar formulário
+  if (!validateForm()) {
+    return;
+  }
 
-    const success = await signUp(formData);
+  // ✅ AGUARDAR RETORNO DO SIGNUP
+  const success = await signUp(formData);
 
-    // Limpar formulário após cadastro bem-sucedido
-    if (success !== false) {
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        password: "",
-        confirmPassword: "",
-      });
-    }
-  };
+  // ✅ LIMPAR FORMULÁRIO APENAS SE SUCESSO
+  if (success === true) {
+    setFormData({
+      name: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+    });
+    setErrors({}); // Limpar erros também
+  }
+  // Se success === false, mantém os dados para o usuário corrigir
+};
 
   return (
     <div className="flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-gradient-to-br min-h-screen">

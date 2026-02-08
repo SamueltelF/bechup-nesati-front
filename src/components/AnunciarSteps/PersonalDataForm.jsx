@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { User, Calendar, CreditCard, Upload, Camera, ChevronLeft, Check, AlertCircle } from "lucide-react";
-import axios from "../../lib/axios";
+import { User, Calendar, CreditCard, ChevronLeft, Check, AlertCircle } from "lucide-react";
+import { useUserStore } from "../../stores/useUserStore";
+import { toast } from "react-hot-toast";
 
 const PersonalDataForm = ({ onComplete, onBack }) => {
-  const [loading, setLoading] = useState(false);
+  const { submitVendorApplication, loading } = useUserStore();
+  
   const [formData, setFormData] = useState({
     fullName: "",
     cpf: "",
@@ -12,17 +14,7 @@ const PersonalDataForm = ({ onComplete, onBack }) => {
     displayName: ""
   });
 
-  const [photos, setPhotos] = useState({
-    personalPhoto: null,
-    rgFrontPhoto: null,
-    rgBackPhoto: null
-  });
-
-  const [previews, setPreviews] = useState({
-    personalPhoto: null,
-    rgFrontPhoto: null,
-    rgBackPhoto: null
-  });
+ 
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -38,139 +30,89 @@ const PersonalDataForm = ({ onComplete, onBack }) => {
     }
   };
 
-  const handlePhotoChange = (e, type) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      alert("A imagem deve ter no máximo 5MB");
-      return;
-    }
-
-    setPhotos({ ...photos, [type]: file });
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviews({ ...previews, [type]: reader.result });
-    };
-    reader.readAsDataURL(file);
-  };
 
   const validateCPF = (cpf) => {
     const cleaned = cpf.replace(/\D/g, "");
-    return cleaned.length === 11;
+    if (cleaned.length !== 11) return false;
+    
+    // Verifica se todos os dígitos são iguais
+    if (/^(\d)\1{10}$/.test(cleaned)) return false;
+    
+    return true;
   };
 
   const validateAge = (date) => {
     const birthDate = new Date(date);
     const today = new Date();
     const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      return age - 1 >= 18;
+    }
+    
     return age >= 18;
   };
 
-  const handleSubmit = async () => {
-    // Validações
-    if (!formData.fullName || formData.fullName.length < 3) {
-      alert("Nome completo é obrigatório (mínimo 3 caracteres)");
-      return;
+  const validateForm = () => {
+    if (!formData.fullName.trim()) {
+      toast.error("Nome completo é obrigatório");
+      return false;
+    }
+
+    if (formData.fullName.trim().split(" ").length < 2) {
+      toast.error("Por favor, insira seu nome completo");
+      return false;
     }
 
     if (!validateCPF(formData.cpf)) {
-      alert("CPF inválido");
-      return;
+      toast.error("CPF inválido");
+      return false;
     }
 
     if (!formData.dateOfBirth) {
-      alert("Data de nascimento é obrigatória");
-      return;
+      toast.error("Data de nascimento é obrigatória");
+      return false;
     }
 
     if (!validateAge(formData.dateOfBirth)) {
-      alert("Você deve ter no mínimo 18 anos");
-      return;
+      toast.error("Você deve ter no mínimo 18 anos");
+      return false;
     }
 
-    if (!photos.personalPhoto || !photos.rgFrontPhoto || !photos.rgBackPhoto) {
-      alert("Todas as fotos são obrigatórias");
+    return true;
+  };
+
+
+  const handleSubmit = async () => {
+    // Validar formulário
+    if (!validateForm()) {
       return;
     }
-
-    setLoading(true);
 
     try {
-      // Converter fotos para base64
-      const toBase64 = (file) => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = error => reject(error);
-      });
-
-      const personalPhotoBase64 = await toBase64(photos.personalPhoto);
-      const rgFrontBase64 = await toBase64(photos.rgFrontPhoto);
-      const rgBackBase64 = await toBase64(photos.rgBackPhoto);
-
-      // Enviar para o backend
-      await axios.post("/vendor/profile", {
-        fullName: formData.fullName,
+      // Enviar para o backend através do store
+      const result = await submitVendorApplication({
+        fullName: formData.fullName.trim(),
         cpf: formData.cpf.replace(/\D/g, ""),
         dateOfBirth: formData.dateOfBirth,
-        displayName: formData.displayName || formData.fullName,
-        personalPhoto: personalPhotoBase64,
-        rgFrontPhoto: rgFrontBase64,
-        rgBackPhoto: rgBackBase64
+        displayName: formData.displayName.trim() || formData.fullName.trim(),
       });
 
-      alert("Perfil de vendedor criado! Aguarde a aprovação da equipe.");
-      onComplete();
+      if (result.success) {
+        toast.success("Solicitação enviada com sucesso!");
+        setTimeout(() => {
+          onComplete();
+        }, 1500);
+      }
+
     } catch (error) {
-      alert(error.response?.data?.message || "Erro ao criar perfil de vendedor");
-    } finally {
-      setLoading(false);
+      console.error("Erro ao enviar:", error);
+      toast.error("Erro ao processar solicitação. Tente novamente.");
     }
   };
 
-  const PhotoUpload = ({ type, label, icon: Icon, preview }) => (
-    <div className="bg-white bg-opacity-5 rounded-xl p-4">
-      <label className="block text-purple-200 text-sm font-semibold mb-3 flex items-center gap-2">
-        <Icon className="h-4 w-4" />
-        {label}
-      </label>
-      
-      <div className="relative">
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => handlePhotoChange(e, type)}
-          className="hidden"
-          id={type}
-        />
-        <label
-          htmlFor={type}
-          className="block cursor-pointer"
-        >
-          {preview ? (
-            <div className="relative group">
-              <img
-                src={preview}
-                alt={label}
-                className="w-full h-48 object-cover rounded-lg"
-              />
-              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
-                <Camera className="h-8 w-8 text-white" />
-              </div>
-            </div>
-          ) : (
-            <div className="border-2 border-dashed border-purple-400 rounded-lg h-48 flex flex-col items-center justify-center hover:border-purple-300 transition-colors">
-              <Upload className="h-12 w-12 text-purple-300 mb-2" />
-              <span className="text-purple-200 text-sm">Clique para fazer upload</span>
-              <span className="text-purple-300 text-xs mt-1">Máximo 5MB</span>
-            </div>
-          )}
-        </label>
-      </div>
-    </div>
-  );
+  
 
   return (
     <motion.div
@@ -263,34 +205,6 @@ const PersonalDataForm = ({ onComplete, onBack }) => {
                 className="w-full px-4 py-3 bg-white bg-opacity-20 border border-white border-opacity-30 rounded-lg text-white placeholder-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
-          </div>
-
-          {/* Upload de Fotos */}
-          <div>
-            <h3 className="text-xl font-semibold text-white mb-4">Documentos de Verificação *</h3>
-            <div className="grid md:grid-cols-3 gap-4">
-              <PhotoUpload
-                type="personalPhoto"
-                label="Foto Pessoal"
-                icon={Camera}
-                preview={previews.personalPhoto}
-              />
-              <PhotoUpload
-                type="rgFrontPhoto"
-                label="RG Frente"
-                icon={CreditCard}
-                preview={previews.rgFrontPhoto}
-              />
-              <PhotoUpload
-                type="rgBackPhoto"
-                label="RG Verso"
-                icon={CreditCard}
-                preview={previews.rgBackPhoto}
-              />
-            </div>
-            <p className="text-purple-300 text-xs mt-3">
-              * Certifique-se de que as fotos estejam nítidas e legíveis
-            </p>
           </div>
 
           {/* Status de Aprovação */}

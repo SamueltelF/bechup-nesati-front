@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { User, Phone, FileText, CreditCard } from "lucide-react";
+import { User, Phone, FileText, CreditCard, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
+import { toast } from "react-hot-toast";
 import { useUserStore } from "../../stores/useUserStore";
 import AuthVerification from "../../components/AnunciarSteps/AuthVerification.jsx";
 import PhoneVerification from "../../components/AnunciarSteps/PhoneVerification.jsx";
@@ -15,13 +16,54 @@ const steps = [
 ];
 
 const AnunciarPage = () => {
-  const { user } = useUserStore();
+  const { user, getVendorApplicationStatus } = useUserStore();
   const [activeStep, setActiveStep] = useState("auth");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [applicationStatus, setApplicationStatus] = useState(null);
   
   // ⚠️ MODO DE DESENVOLVIMENTO - Permite navegar livremente
   const [devMode, setDevMode] = useState(false);
 
+  // ✅ VERIFICAR STATUS DA APLICAÇÃO AO CARREGAR
+  useEffect(() => {
+    const checkApplicationStatus = async () => {
+      if (user) {
+        const status = await getVendorApplicationStatus();
+        setApplicationStatus(status);
+        
+        // Se tem submissão pendente, mostrar aviso
+        if (status?.hasSubmission) {
+          const { submission } = status;
+          
+          if (submission.status === "pending") {
+            toast.info("Você já tem uma solicitação em análise! Aguarde a resposta da equipe.", {
+              duration: 5000,
+            });
+          } else if (submission.status === "under_review") {
+            toast.info("Sua solicitação está sendo analisada pela equipe!", {
+              duration: 5000,
+            });
+          } else if (submission.status === "approved") {
+            toast.success("Sua solicitação foi aprovada! Você já é um vendedor.", {
+              duration: 5000,
+            });
+            // Redirecionar para dashboard de vendedor
+            setTimeout(() => {
+              window.location.href = "/vendor/dashboard";
+            }, 2000);
+          } else if (submission.status === "rejected") {
+            toast.error(`Sua solicitação foi rejeitada. Motivo: ${submission.decision?.reason || "Não especificado"}`, {
+              duration: 8000,
+            });
+          }
+        }
+      }
+    };
+    
+    checkApplicationStatus();
+  }, [user]);
+
+  // ✅ CONTROLAR NAVEGAÇÃO ENTRE STEPS
   useEffect(() => {
     // No modo dev, permite navegar livremente
     if (devMode) return;
@@ -78,6 +120,39 @@ const AnunciarPage = () => {
             {devMode ? "🔓 Modo Dev ON" : "🔒 Modo Dev OFF"}
           </button>
         </div>
+
+        {/* ✅ BANNER DE STATUS (se tiver aplicação pendente/rejeitada) */}
+        {applicationStatus?.hasSubmission && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6"
+          >
+            {applicationStatus.submission.status === "pending" && (
+              <div className="bg-blue-900 bg-opacity-50 border border-blue-400 rounded-lg p-4 flex gap-3">
+                <AlertCircle className="h-6 w-6 text-blue-400 flex-shrink-0" />
+                <div className="text-sm text-blue-100">
+                  <p className="font-semibold mb-1">Solicitação em Análise</p>
+                  <p>Sua solicitação está sendo analisada pela equipe. Você receberá um email com o resultado em até 72h úteis.</p>
+                  <p className="text-xs mt-2 text-blue-300">
+                    Enviado em: {new Date(applicationStatus.submission.submittedAt).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {applicationStatus.submission.status === "rejected" && (
+              <div className="bg-red-900 bg-opacity-50 border border-red-400 rounded-lg p-4 flex gap-3">
+                <AlertCircle className="h-6 w-6 text-red-400 flex-shrink-0" />
+                <div className="text-sm text-red-100">
+                  <p className="font-semibold mb-1">Solicitação Rejeitada</p>
+                  <p className="mb-2">Motivo: {applicationStatus.submission.decision?.reason || "Não especificado"}</p>
+                  <p className="text-xs">Você pode enviar uma nova solicitação com os dados corrigidos.</p>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
 
         <motion.div
           initial={{ opacity: 0, y: -40 }}
@@ -164,8 +239,13 @@ const AnunciarPage = () => {
           {activeStep === "personal" && (
             <PersonalDataForm 
               onComplete={() => {
-                // Redirecionar para página de sucesso ou dashboard
-                window.location.href = "/vendor/dashboard";
+                // ✅ Redirecionar para página de aguardando aprovação
+                toast.success("Solicitação enviada! Redirecionando...", {
+                  duration: 2000,
+                });
+                setTimeout(() => {
+                  window.location.href = "/";
+                }, 2000);
               }}
               onBack={() => handleStepComplete("terms")}
             />
