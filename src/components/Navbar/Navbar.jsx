@@ -9,7 +9,7 @@ const Navbar = () => {
   const { cart } = useCartStore();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const location = useLocation();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role?.includes("vendor");
   
   // Verifica se está nas páginas de login ou registro
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';

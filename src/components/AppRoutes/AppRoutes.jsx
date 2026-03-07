@@ -23,7 +23,7 @@ const AppRoutes = () => {
   const location = useLocation();
  
   useEffect(() => {
-    if (!user && checkingAuth) checkAuth();
+    checkAuth();
   }, [checkAuth]);
  
   useEffect(() => {
@@ -64,7 +64,7 @@ const AppRoutes = () => {
         <Route
           path="/admin-dashboard"
           element={
-            user?.role === "admin" ? (
+            user?.role?.includes("vendor") ? (
               <AdminDashboardPage />
             ) : (
               <Navigate to={user ? "/" : "/login"} />

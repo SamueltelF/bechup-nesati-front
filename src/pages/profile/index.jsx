@@ -234,7 +234,7 @@ const ProfilePage = () => {
                   <div>
                     <p className="text-sm text-gray-300">Tipo de Conta</p>
                     <p className="text-lg font-bold text-white uppercase">
-                      {user?.role === "admin" ? "Administrador" : "Cliente"}
+                      {user?.role?.includes("vendor" ) ? "Administrador" : "Cliente"}
                     </p>
                   </div>
                 </div>
